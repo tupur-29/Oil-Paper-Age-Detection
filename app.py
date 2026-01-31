@@ -23,7 +23,7 @@ st.write("---")
 @st.cache_resource
 def load_tflite_model():
     try:
-        interpreter = tflite.Interpreter(model_path="model(1).tflite")
+        interpreter = tflite.Interpreter(model_path="model (1).tflite")
         interpreter.allocate_tensors()
         return interpreter
     except Exception as e:
