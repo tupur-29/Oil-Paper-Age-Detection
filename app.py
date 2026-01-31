@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 from PIL import Image
 import tensorflow as tf
+from tensorflow.keras.models import load_model
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Insulation Aging Classifier", page_icon="⚡")
@@ -12,21 +13,21 @@ st.markdown("""
 This system uses a **Tri-Stream CNN with CBAM Attention** to classify microscopic insulation samples.
 """)
 
-# --- LOAD MODEL FUNCTION ---
+# --- LOAD MODEL FUNCTION (.h5 version) ---
 @st.cache_resource
-def load_model():
-    # Load TFLite model and allocate tensors.
-    interpreter = tf.lite.Interpreter(model_path="model.tflite")
-    interpreter.allocate_tensors()
-    return interpreter
+def load_keras_model():
+    # This loads the .h5 file directly
+    try:
+        model = load_model("cnn_model_cbam.h5")
+        return model
+    except Exception as e:
+        st.error(f"Error loading model. Check if the file exists! Error: {e}")
+        return None
 
-try:
-    interpreter = load_model()
-    input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
+model = load_keras_model()
+
+if model is not None:
     st.success("✅ Model Loaded Successfully")
-except Exception as e:
-    st.error(f"Error loading model: {e}")
 
 # --- PREPROCESSING FUNCTION ---
 def preprocess_image(image):
@@ -58,42 +59,41 @@ if uploaded_file is not None:
     
     # Button to Predict
     if st.button("Analyze Aging Condition"):
-        with st.spinner("Processing image with Tri-Stream CNN..."):
-            try:
-                # Preprocess
-                processed_img = preprocess_image(image)
-                
-                # Set Input Tensor
-                interpreter.set_tensor(input_details[0]['index'], processed_img)
-                
-                # Run Inference
-                interpreter.invoke()
-                
-                # Get Output Tensor
-                output_data = interpreter.get_tensor(output_details[0]['index'])
-                
-                # Get Class Index and Confidence
-                class_names = ["Fresh", "Highly Aged", "Lightly Aged"] # Ensure this order matches your training!
-                pred_index = np.argmax(output_data)
-                confidence = np.max(output_data) * 100
-                result = class_names[pred_index]
-                
-                # Display Results
-                st.write("---")
-                st.subheader(f"Prediction: **{result}**")
-                st.write(f"Confidence: **{confidence:.2f}%**")
-                
-                # Visual Bar Chart for Probabilities
-                st.write("Class Probabilities:")
-                st.bar_chart(dict(zip(class_names, output_data[0])))
-                
-                # Custom Message based on result
-                if result == "Highly Aged":
-                    st.error("⚠️ CRITICAL: Insulation is severely degraded. Maintenance recommended.")
-                elif result == "Lightly Aged":
-                    st.warning("⚠️ WARNING: Early signs of aging detected.")
-                else:
-                    st.success("✅ HEALTHY: Insulation appears fresh and good.")
+        if model is None:
+            st.error("Model not loaded.")
+        else:
+            with st.spinner("Processing image with Tri-Stream CNN..."):
+                try:
+                    # Preprocess
+                    processed_img = preprocess_image(image)
                     
-            except Exception as e:
-                st.error(f"Prediction Error: {e}")
+                    # Run Inference (Standard Keras Predict)
+                    prediction_array = model.predict(processed_img)
+                    
+                    # Get Class Index and Confidence
+                    # IMPORTANT: Verify this order matches your training labels!
+                    class_names = ["Fresh", "Highly Aged", "Lightly Aged"] 
+                    
+                    pred_index = np.argmax(prediction_array)
+                    confidence = np.max(prediction_array) * 100
+                    result = class_names[pred_index]
+                    
+                    # Display Results
+                    st.write("---")
+                    st.subheader(f"Prediction: **{result}**")
+                    st.write(f"Confidence: **{confidence:.2f}%**")
+                    
+                    # Visual Bar Chart for Probabilities
+                    st.write("Class Probabilities:")
+                    st.bar_chart(dict(zip(class_names, prediction_array[0])))
+                    
+                    # Custom Message based on result
+                    if result == "Highly Aged":
+                        st.error("⚠️ CRITICAL: Insulation is severely degraded. Maintenance recommended.")
+                    elif result == "Lightly Aged":
+                        st.warning("⚠️ WARNING: Early signs of aging detected.")
+                    else:
+                        st.success("✅ HEALTHY: Insulation appears fresh and good.")
+                        
+                except Exception as e:
+                    st.error(f"Prediction Error: {e}")
