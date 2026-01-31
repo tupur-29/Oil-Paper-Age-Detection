@@ -1,12 +1,8 @@
 import streamlit as st
 import numpy as np
 from PIL import Image
+import tensorflow.lite as tflite
 
-# Use tflite-runtime instead of full TensorFlow
-try:
-    import tflite_runtime.interpreter as tflite
-except ImportError:
-    import tensorflow.lite as tflite
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
