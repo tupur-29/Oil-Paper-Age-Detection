@@ -18,7 +18,20 @@ This system uses a **Tri-Stream CNN with CBAM Attention** to classify microscopi
 def load_keras_model():
     # This loads the .h5 file directly
     try:
-        model = load_model("cnn_model_cbam.h5")
+        # -----------------------------------------------------------
+        # FIX: Enable unsafe deserialization to allow Lambda layers
+        # -----------------------------------------------------------
+        import keras
+        try:
+            # For newer Keras versions (TensorFlow 2.16+)
+            keras.config.enable_unsafe_deserialization()
+        except AttributeError:
+            # For older Keras versions, usually not needed, 
+            # but we can pass safe_mode=False in load_model below
+            pass
+            
+        # Load model with safe_mode=False to allow the Lambda layers
+        model = load_model("cnn_model_cbam.h5", safe_mode=False)
         return model
     except Exception as e:
         st.error(f"Error loading model. Check if the file exists! Error: {e}")
