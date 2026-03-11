@@ -365,8 +365,33 @@ def run_analysis():
                 confidence = float(np.max(output_data) * 100)
                 
                 # Show results
-                st.subheader(f"Prediction: {result}")
-                st.write(f"Confidence: {confidence:.2f}%")
+                #st.subheader(f"Prediction: {result}")
+                #st.write(f"Confidence: {confidence:.2f}%")
+                if result == "Highly Aged":
+                            st.error(f"**Prediction: {result}**")
+                            st.error(f"**Confidence: {confidence:.2f}%**")
+                            st.markdown("⚠️ **CRITICAL:** Insulation is severely degraded. Immediate maintenance recommended.")
+                elif result == "Lightly Aged":
+                            st.warning(f"**Prediction: {result}**")
+                            st.warning(f"**Confidence: {confidence:.2f}%**")
+                            st.markdown("⚠️ **WARNING:** Early signs of aging detected. Schedule inspection.")
+                else:
+                            st.success(f"**Prediction: {result}**")
+                            st.success(f"**Confidence: {confidence:.2f}%**")
+                            st.markdown("✅ **HEALTHY:** Insulation appears fresh and in good condition.")
+                    
+                # Show probability distribution
+                st.write("---")
+                st.subheader("📈 Class Probability Distribution")
+                    
+                # Create a nice bar chart
+                prob_dict = {name: float(prob) for name, prob in zip(class_names, prediction_array)}
+                st.bar_chart(prob_dict)
+                    
+                # Show raw probabilities
+                st.write("**Detailed Probabilities:**")
+                for name, prob in zip(class_names, prediction_array):
+                        st.write(f"- {name}: {prob*100:.2f}%")
                 
                 # SAVE TO DATABASE
                 conn = sqlite3.connect('transformer_app.db')
