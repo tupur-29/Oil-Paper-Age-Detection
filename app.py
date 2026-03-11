@@ -156,11 +156,7 @@ from PIL import Image
 import sqlite3
 import hashlib
 from datetime import datetime
-
-try:
-    import tflite_runtime.interpreter as tflite
-except ImportError:
-    import tensorflow.lite as tflite
+import tensorflow.lite as tflite
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Transformer AI Software", page_icon="⚡", layout="wide")
