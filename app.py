@@ -164,14 +164,14 @@ st.set_page_config(page_title="Transformer Diagnostics", page_icon="⚡", layout
 # --- CUSTOM CSS FOR UI ---
 st.markdown("""
     <style>
-    .main-title {text-align: center; color: #0b5394; padding-bottom: 20px;}
-    .sub-title {text-align: center; color: #666666;}
-    div[data-testid="stMetricValue"] {font-size: 2rem;}
+    .main-title {text-align: center; color: #4A90E2; padding-bottom: 10px; font-weight: 800;}
+    .sub-title {text-align: center; color: #888888; margin-bottom: 40px;}
+    .center-card {margin: 0 auto; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);}
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 1. DATABASE SETUP (SQLite)
+# 1. DATABASE SETUP
 # ==========================================
 def init_db():
     conn = sqlite3.connect('transformer_app.db')
@@ -183,7 +183,7 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS inspections
                  (email TEXT, timestamp TEXT, prediction TEXT, confidence REAL)''')
     
-    # Create Default Admin if not exists (Failsafe)
+    # Create Default Admin just in case
     c.execute("SELECT * FROM users WHERE email='admin'")
     if not c.fetchone():
         c.execute("INSERT INTO users VALUES ('admin', ?, 'Master Admin', 'ADMIN-00', 'N/A', 'admin')", 
@@ -197,13 +197,16 @@ def hash_password(password):
 init_db()
 
 # ==========================================
-# 2. SESSION STATE
+# 2. SESSION STATE ROUTING
 # ==========================================
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user_email = ""
     st.session_state.role = ""
     st.session_state.current_page = "Landing"
+
+def navigate(page):
+    st.session_state.current_page = page
 
 # ==========================================
 # 3. MACHINE LEARNING LOGIC
@@ -231,38 +234,54 @@ def preprocess_image(image):
     return img_array
 
 # ==========================================
-# 4. PORTAL PAGES
+# 4. PORTAL PAGES (LANDING, LOGIN, SIGNUP)
 # ==========================================
 def landing_page():
     st.markdown("<h1 class='main-title'>⚡ AI Transformer Health Monitor</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 class='sub-title'>Centralized Dashboard for Oil-Paper Insulation Diagnostics</h4><br><br>", unsafe_allow_html=True)
+    st.markdown("<h4 class='sub-title'>Centralized Dashboard for Oil-Paper Insulation Diagnostics</h4>", unsafe_allow_html=True)
     
-    col1, col2, col3, col4, col5 = st.columns([1, 2, 0.5, 2, 1])
-    with col2:
-        st.info("### 👨‍💻 Existing Personnel")
-        if st.button("Access Dashboard (Login)", use_container_width=True):
-            st.session_state.current_page = "Login"
-            st.rerun()
-    with col4:
-        st.success("### 📝 New Registration")
-        if st.button("Create Account (Sign Up)", use_container_width=True):
-            st.session_state.current_page = "Signup"
-            st.rerun()
+    # Create two distinct distinct cards side by side
+    col1, col_gap, col2 = st.columns([1, 0.2, 1])
+    
+    with col1:
+        with st.container(border=True):
+            st.markdown("<h3 style='text-align: center;'>👨‍🔧 Field Engineer Portal</h3>", unsafe_allow_html=True)
+            st.write("For lab technicians and engineers to run image diagnostics and view their reports.")
+            st.write("")
+            if st.button("Engineer Login", type="primary", use_container_width=True, key="user_login"):
+                navigate("User_Login")
+                st.rerun()
+            if st.button("Engineer Sign Up", use_container_width=True, key="user_signup"):
+                navigate("User_Signup")
+                st.rerun()
 
-def signup_page():
-    st.markdown("<h2 class='main-title'>📝 System Registration</h2>", unsafe_allow_html=True)
+    with col2:
+        with st.container(border=True):
+            st.markdown("<h3 style='text-align: center;'>🛠️ System Admin Portal</h3>", unsafe_allow_html=True)
+            st.write("For system administrators to manage users and view global plant inspections.")
+            st.write("")
+            if st.button("Admin Login", type="primary", use_container_width=True, key="admin_login"):
+                navigate("Admin_Login")
+                st.rerun()
+            if st.button("Admin Sign Up", use_container_width=True, key="admin_signup"):
+                navigate("Admin_Signup")
+                st.rerun()
+
+def signup_page(role="user"):
+    role_title = "Field Engineer" if role == "user" else "System Admin"
+    st.markdown(f"<h2 class='main-title'>📝 {role_title} Registration</h2>", unsafe_allow_html=True)
     
-    # Centering the form
+    # Center the form
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        with st.container():
-            role = st.selectbox("Register As:", ["user", "admin"], format_func=lambda x: "Field Engineer" if x=="user" else "System Admin")
+        with st.container(border=True):
             email = st.text_input("Email Address")
             password = st.text_input("Password", type='password')
             name = st.text_input("Full Name")
             emp_id = st.text_input("Employee / Badge ID")
             phone = st.text_input("Contact Number")
             
+            st.write("---")
             c1, c2 = st.columns(2)
             with c1:
                 if st.button("Register Account", type="primary", use_container_width=True):
@@ -276,48 +295,55 @@ def signup_page():
                             c.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?)", 
                                       (email, hash_password(password), name, emp_id, phone, role))
                             conn.commit()
-                            st.success(f"Successfully registered as {role.upper()}! You can now login.")
+                            st.success(f"Registered as {role_title}! You can now login.")
                         conn.close()
                     else:
                         st.warning("Please fill required fields (Email, Password, Name).")
             with c2:
-                if st.button("Cancel / Home", use_container_width=True):
-                    st.session_state.current_page = "Landing"
+                if st.button("⬅️ Back to Home", use_container_width=True):
+                    navigate("Landing")
                     st.rerun()
 
-def login_page():
-    st.markdown("<h2 class='main-title'>🔐 System Authentication</h2>", unsafe_allow_html=True)
+def login_page(role="user"):
+    role_title = "Field Engineer" if role == "user" else "System Admin"
+    st.markdown(f"<h2 class='main-title'>🔐 {role_title} Login</h2>", unsafe_allow_html=True)
     
+    # Center the form
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
-        email = st.text_input("Email / Username")
-        password = st.text_input("Password", type='password')
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("Secure Login", type="primary", use_container_width=True):
-                conn = sqlite3.connect('transformer_app.db')
-                c = conn.cursor()
-                c.execute("SELECT role FROM users WHERE email=? AND password=?", (email, hash_password(password)))
-                result = c.fetchone()
-                if result:
-                    st.session_state.logged_in = True
-                    st.session_state.user_email = email
-                    st.session_state.role = result[0]
-                    st.session_state.current_page = "Dashboard"
-                    
-                    # Log history
-                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    c.execute("INSERT INTO login_history VALUES (?, ?)", (email, now))
-                    conn.commit()
+        with st.container(border=True):
+            email = st.text_input("Email / Username")
+            password = st.text_input("Password", type='password')
+            
+            st.write("---")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("Secure Login", type="primary", use_container_width=True):
+                    conn = sqlite3.connect('transformer_app.db')
+                    c = conn.cursor()
+                    c.execute("SELECT role FROM users WHERE email=? AND password=?", (email, hash_password(password)))
+                    result = c.fetchone()
+                    if result:
+                        db_role = result[0]
+                        if db_role != role:
+                            st.error(f"Access Denied. This email is registered as a {db_role}, not a {role}.")
+                        else:
+                            st.session_state.logged_in = True
+                            st.session_state.user_email = email
+                            st.session_state.role = db_role
+                            st.session_state.current_page = "Dashboard"
+                            
+                            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            c.execute("INSERT INTO login_history VALUES (?, ?)", (email, now))
+                            conn.commit()
+                            st.rerun()
+                    else:
+                        st.error("Invalid credentials. Please try again.")
+                    conn.close()
+            with c2:
+                if st.button("⬅️ Back to Home", use_container_width=True):
+                    navigate("Landing")
                     st.rerun()
-                else:
-                    st.error("Invalid credentials. Access Denied.")
-                conn.close()
-        with c2:
-            if st.button("Back to Home", use_container_width=True):
-                st.session_state.current_page = "Landing"
-                st.rerun()
 
 # ==========================================
 # 5. USER DASHBOARD (ENGINEER)
@@ -336,7 +362,7 @@ def user_dashboard():
     menu = st.sidebar.radio("Navigation Menu", ["🔬 Run AI Analysis", "📄 My Inspections", "🕒 Login History"])
     
     st.sidebar.write("---")
-    if st.sidebar.button("Logout", type="primary"):
+    if st.sidebar.button("Logout", type="primary", use_container_width=True):
         st.session_state.logged_in = False
         st.session_state.current_page = "Landing"
         st.rerun()
@@ -350,16 +376,18 @@ def user_dashboard():
 
 def run_analysis():
     st.markdown("## 🔬 Automated Insulation Diagnosis")
-    st.write("Upload a microscopic image of the oil-paper sample to run the Tri-Stream CBAM analysis.")
+    st.write("Upload a microscopic image of the oil-paper sample to run the AI analysis.")
+    st.write("---")
     
     col1, col2 = st.columns([1, 1.5])
     
     with col1:
-        uploaded_file = st.file_uploader("Select Image File", type=["jpg", "png", "jpeg"])
-        if uploaded_file is not None:
-            image = Image.open(uploaded_file).convert("RGB")
-            st.image(image, caption="Sample Preview", use_column_width=True)
-            analyze_btn = st.button("🔍 Run AI Analysis", type="primary", use_container_width=True)
+        with st.container(border=True):
+            uploaded_file = st.file_uploader("Select Image File", type=["jpg", "png", "jpeg"])
+            if uploaded_file is not None:
+                image = Image.open(uploaded_file).convert("RGB")
+                st.image(image, caption="Sample Preview", use_column_width=True)
+                analyze_btn = st.button("🔍 Analyze Sample", type="primary", use_container_width=True)
             
     with col2:
         if uploaded_file is not None and analyze_btn:
@@ -374,7 +402,6 @@ def run_analysis():
                 
                 interpreter.set_tensor(input_details[0]['index'], processed_img)
                 interpreter.invoke()
-                # FIX: Storing result in output_data
                 output_data = interpreter.get_tensor(output_details[0]['index'])[0] 
                 
                 class_names = ["Fresh", "Highly Aged", "Lightly Aged"]
@@ -382,25 +409,25 @@ def run_analysis():
                 result = class_names[pred_index]
                 confidence = float(np.max(output_data) * 100)
                 
-                st.write("### 📊 Diagnostic Results")
-                if result == "Highly Aged":
-                    st.error(f"**Condition:** {result}")
-                    st.error(f"**Confidence:** {confidence:.2f}%")
-                    st.markdown("⚠️ **CRITICAL:** Insulation severely degraded. Maintenance required.")
-                elif result == "Lightly Aged":
-                    st.warning(f"**Condition:** {result}")
-                    st.warning(f"**Confidence:** {confidence:.2f}%")
-                    st.markdown("⚠️ **WARNING:** Early aging detected. Schedule monitoring.")
-                else:
-                    st.success(f"**Condition:** {result}")
-                    st.success(f"**Confidence:** {confidence:.2f}%")
-                    st.markdown("✅ **HEALTHY:** Insulation is in optimal condition.")
-                    
-                st.write("---")
-                st.write("**Class Probability Distribution:**")
-                # FIX: Using output_data instead of prediction_array
-                prob_dict = {name: float(prob) for name, prob in zip(class_names, output_data)}
-                st.bar_chart(prob_dict)
+                with st.container(border=True):
+                    st.write("### 📊 Diagnostic Results")
+                    if result == "Highly Aged":
+                        st.error(f"**Condition:** {result}")
+                        st.error(f"**Confidence:** {confidence:.2f}%")
+                        st.markdown("⚠️ **CRITICAL:** Insulation severely degraded. Maintenance required.")
+                    elif result == "Lightly Aged":
+                        st.warning(f"**Condition:** {result}")
+                        st.warning(f"**Confidence:** {confidence:.2f}%")
+                        st.markdown("⚠️ **WARNING:** Early aging detected. Schedule monitoring.")
+                    else:
+                        st.success(f"**Condition:** {result}")
+                        st.success(f"**Confidence:** {confidence:.2f}%")
+                        st.markdown("✅ **HEALTHY:** Insulation is in optimal condition.")
+                        
+                with st.container(border=True):
+                    st.write("**Probability Distribution:**")
+                    prob_dict = {name: float(prob) for name, prob in zip(class_names, output_data)}
+                    st.bar_chart(prob_dict)
                 
                 # Save to DB
                 conn = sqlite3.connect('transformer_app.db')
@@ -410,7 +437,6 @@ def run_analysis():
                           (st.session_state.user_email, now, result, confidence))
                 conn.commit()
                 conn.close()
-                st.toast("✅ Inspection saved to secure database.")
 
 # ==========================================
 # 6. ADMIN DASHBOARD
@@ -423,7 +449,7 @@ def admin_dashboard():
     menu = st.sidebar.radio("Admin Menu", ["System Overview", "Global Inspections", "Manage Users"])
     
     st.sidebar.write("---")
-    if st.sidebar.button("Logout", type="primary"):
+    if st.sidebar.button("Logout", type="primary", use_container_width=True):
         st.session_state.logged_in = False
         st.session_state.current_page = "Landing"
         st.rerun()
@@ -432,24 +458,23 @@ def admin_dashboard():
     
     if menu == "System Overview":
         st.markdown("## 📈 System Overview")
-        # Quick Metrics
-        c1, c2, c3 = st.columns(3)
-        user_count = pd.read_sql_query("SELECT COUNT(*) FROM users", conn).iloc[0,0]
-        insp_count = pd.read_sql_query("SELECT COUNT(*) FROM inspections", conn).iloc[0,0]
-        crit_count = pd.read_sql_query("SELECT COUNT(*) FROM inspections WHERE prediction='Highly Aged'", conn).iloc[0,0]
-        
-        c1.metric("Total Registered Users", user_count)
-        c2.metric("Total Inspections Logged", insp_count)
-        c3.metric("Critical Alerts (Highly Aged)", crit_count)
+        with st.container(border=True):
+            c1, c2, c3 = st.columns(3)
+            user_count = pd.read_sql_query("SELECT COUNT(*) FROM users", conn).iloc[0,0]
+            insp_count = pd.read_sql_query("SELECT COUNT(*) FROM inspections", conn).iloc[0,0]
+            crit_count = pd.read_sql_query("SELECT COUNT(*) FROM inspections WHERE prediction='Highly Aged'", conn).iloc[0,0]
+            
+            c1.metric("Total Registered Users", user_count)
+            c2.metric("Total Inspections Logged", insp_count)
+            c3.metric("Critical Alerts", crit_count)
         
     elif menu == "Global Inspections":
         st.markdown("## 🌍 Network-Wide Inspections")
         df = pd.read_sql_query("SELECT email as User, timestamp as Date_Time, prediction as Result, confidence as Confidence_Percent FROM inspections ORDER BY timestamp DESC", conn)
         st.dataframe(df, use_container_width=True)
-        st.download_button("Download Audit Log (CSV)", df.to_csv(index=False).encode('utf-8'), "global_audit.csv")
         
     elif menu == "Manage Users":
-        st.markdown("## 👥 User Management")
+        st.markdown("## 👥 Registered Personnel")
         df = pd.read_sql_query("SELECT name as Name, emp_id as Badge_ID, email as Email, role as Role, phone as Contact FROM users", conn)
         st.dataframe(df, use_container_width=True)
         
@@ -469,7 +494,7 @@ def show_user_reports():
     else:
         st.dataframe(df, use_container_width=True)
         csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("Download My Reports (CSV)", data=csv, file_name="my_inspections.csv", mime="text/csv")
+        st.download_button("Download Report (CSV)", data=csv, file_name="my_inspections.csv", mime="text/csv")
 
 def show_login_history():
     st.markdown("## 🕒 Account Access Log")
@@ -479,15 +504,19 @@ def show_login_history():
     st.dataframe(df, use_container_width=True)
 
 # ==========================================
-# APP ROUTING MANAGER
+# MAIN ROUTING ENGINE
 # ==========================================
 if not st.session_state.logged_in:
     if st.session_state.current_page == "Landing":
         landing_page()
-    elif st.session_state.current_page == "Signup":
-        signup_page()
-    elif st.session_state.current_page == "Login":
-        login_page()
+    elif st.session_state.current_page == "User_Login":
+        login_page(role="user")
+    elif st.session_state.current_page == "User_Signup":
+        signup_page(role="user")
+    elif st.session_state.current_page == "Admin_Login":
+        login_page(role="admin")
+    elif st.session_state.current_page == "Admin_Signup":
+        signup_page(role="admin")
 else:
     if st.session_state.role == "admin":
         admin_dashboard()
